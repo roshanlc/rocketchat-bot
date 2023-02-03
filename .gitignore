@@ -1,0 +1,5 @@
+.env
+config.yml
+build/
+.cache/
+.logs/
