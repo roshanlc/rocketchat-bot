@@ -1,16 +1,13 @@
 package main
 
-import (
-	"fmt"
-	"log"
-	"net/url"
-	"regexp"
+import "fmt"
 
-	"github.com/RocketChat/Rocket.Chat.Go.SDK/models"
-	"github.com/RocketChat/Rocket.Chat.Go.SDK/realtime"
-	"github.com/RocketChat/Rocket.Chat.Go.SDK/rest"
-)
+func main() {
+	config, err := readConfiguration()
+	fmt.Println(config, err)
+}
 
+/*
 func main() {
 	server := url.URL{
 		Scheme: "http",
@@ -119,3 +116,4 @@ func main() {
 	}
 
 }
+*/

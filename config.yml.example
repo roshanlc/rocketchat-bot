@@ -1,0 +1,46 @@
+## server details
+
+server_details:
+  ## whether http or https
+  scheme: http
+  ## host url
+  url: localhost:3000
+  ## email address
+  email: bot@gmail.com
+  ## Password
+  password: EnterPAss
+
+## channels to listen msg for 
+channels: ['channel1','channel2']
+
+## reply to 
+reply_to:
+  ## Replies to above channels
+  ## Keep limited channels for optimal performance
+  ## convert to go lang regex, use regex101.com for this
+  ## Supports nodejs script only
+  ## If exec_script is provided then other later properties will be ignored
+  ## the script should finish executing within 10 seconds
+  ## the output from script should be on stdout and should follow the json structure
+  ## 
+  ## {
+  ##    "text_reply": "",
+  ##    "image_url": "",
+  ##    "video_url" : "",
+  ## }
+
+- msg_regex: ''
+  ## Script to execute on msg
+  exec_script: "/path/to/nodejs_script.js"
+  ## Text to reply
+  text_reply: ''
+  ## Image url to upload
+  image_url: ''
+  ## Video url to upload
+  video_url: ''
+
+## Run in x minutes automatically
+auto_run:
+## the script format is same as above
+- exec_script: "/path/to/nodejs_script.js"
+- channel: 'channel to send msg to'

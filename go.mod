@@ -12,4 +12,5 @@ require (
 	github.com/gopackage/ddp v0.0.0-20170117053602-652027933df4 // indirect
 	github.com/sony/sonyflake v1.0.0 // indirect
 	golang.org/x/net v0.0.0-20200904194848-62affa334b73 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
