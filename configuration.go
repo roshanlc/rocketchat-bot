@@ -54,6 +54,14 @@ type AutoRun struct {
 	Channel    string `yaml:"channel"`
 }
 
+// MsgReply struct is necessary parsing msg
+// response from scripts
+type MsgReply struct {
+	TextReply string `json:"text_reply,omitempty"`
+	ImageURL  string `json:"image_url,omitempty"`
+	VideoURL  string `json:"video_url,omitempty"`
+}
+
 func (c Configuration) String() string {
 	return fmt.Sprintf("Details:\n"+
 		"\tScheme: %s\n"+
@@ -77,3 +85,21 @@ func readConfiguration() (*Configuration, error) {
 	}
 	return &config, nil
 }
+
+// checks if msg response sent from
+// scripts is empty or not
+func (m *MsgReply) isResponseEmpty() bool {
+	if len(m.ImageURL) == 0 && len(m.VideoURL) == 0 && len(m.TextReply) == 0 {
+		return true
+	}
+	return false
+}
+
+// checks if all fields of response
+// are empty or not
+// func (m *ReplyTo) isResponseEmpty() bool {
+// 	if len(m.ImageURL) == 0 && len(m.VideoURL) == 0 && len(m.TextReply) == 0 {
+// 		return true
+// 	}
+// 	return false
+// }
