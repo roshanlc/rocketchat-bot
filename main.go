@@ -1,17 +1,104 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+	"net/url"
+	"regexp"
+	"sync"
 
-func main() {
-	config, err := readConfiguration()
-	fmt.Println(config, err)
+	"github.com/RocketChat/Rocket.Chat.Go.SDK/models"
+	"github.com/RocketChat/Rocket.Chat.Go.SDK/realtime"
+	"github.com/RocketChat/Rocket.Chat.Go.SDK/rest"
+)
+
+// reply actions for corresponding regex
+type replyAction struct {
+	useScript      bool
+	scriptLocation string
+	textReply      string
+	imageURL       string
+	videoURL       string
 }
 
-/*
+// Map compiled regex with their replies
+// Since we'll be doing concurrent reads only,
+// no mutex lock is necessary as of yet
+// maybe aded later
+var RegexActions = make(map[*regexp.Regexp]replyAction)
+
+// Slice of auto running scripts
+var AutoRunScripts []AutoRun
+
+// map of channel names with their IDs
+var channelIDs = make(map[string]string)
+
+// clients
+var realTimeClient *realtime.Client
+var restClient *rest.Client
+
 func main() {
+	// Graceful shutdown from panic
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Following error has occurred:\n%v\n", r)
+			log.Println("The system will not shutdown.")
+		}
+	}()
+	config, err := readConfiguration()
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	// Print configuration details
+	fmt.Println(config)
+
+	err = config.checkValidity()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	// login to server
+	realTimeClient, restClient, err = config.login()
+
+	// get Channel IDS
+	channelIDs, err = config.getChannelIDs(realTimeClient)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	// Join the channels
+	for _, channelID := range channelIDs {
+		realTimeClient.JoinChannel(channelID)
+	}
+
+	var wgMain sync.WaitGroup
+
+	// Start the cronjobs (replying and auto run scripts)
+	wgMain.Add(1)
+	go func() {
+		defer wgMain.Done()
+		startAutoReply(config, realTimeClient)
+	}()
+
+	wgMain.Wait()
+	// Close real time connection
+	realTimeClient.Close()
+}
+
+// login to the server
+// and return clients for realtime and rest
+func (config *Configuration) login() (*realtime.Client, *rest.Client, error) {
 	server := url.URL{
-		Scheme: "http",
-		Host:   "localhost:3000",
+		Scheme: config.ServerDetails.Scheme,
+		Host:   config.ServerDetails.URL,
+	}
+	loginDetails := models.UserCredentials{
+		Email:    config.ServerDetails.Email,
+		Password: config.ServerDetails.Password,
 	}
 
 	realtimeClient, err := realtime.NewClient(&server, false)
@@ -19,101 +106,43 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	loginDetails := models.UserCredentials{
-		Email:    "bot@idk.com", //"haribdr@jankaritech.com",
-		Password: "pass",
-	}
+	_, err = realtimeClient.Login(&loginDetails)
 
-	userDetails, err := realtimeClient.Login(&loginDetails)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, nil, err
 	}
-	defer realtimeClient.Close()
 
 	restClient := rest.NewClient(&server, false)
 
 	err = restClient.Login(&loginDetails)
 	if err != nil {
-		log.Println(err)
-		return
+		return nil, nil, err
 	}
 
-	fmt.Println("User details:\n", userDetails)
+	return realtimeClient, restClient, nil
+}
 
-	channelName := "try"
+// return channel ids for all channels mentioned in the configuration
+func (config *Configuration) getChannelIDs(rc *realtime.Client) (map[string]string, error) {
+	var allChannels []string
+	// add to chhanels
+	allChannels = append(allChannels, config.Channels...)
 
-	channelID, err := realtimeClient.GetChannelId(channelName)
-
-	if err != nil {
-		log.Println(err)
-		return
+	for _, val := range config.AutoRun {
+		allChannels = append(allChannels, val.Channel)
 	}
 
-	channelDetails := models.Channel{
-		ID: channelID,
-	}
-	fmt.Println("Channel Details:", channelDetails)
-
-	err = realtimeClient.JoinChannel(channelID)
-
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	// channel for listening to realtime msgs
-	msgs := make(chan models.Message)
-
-	err = realtimeClient.SubscribeToMessageStream(&channelDetails, msgs)
-
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	reg1 := regexp.MustCompile(`(?mi)^.*\s*k.*c(h|hh|hhh)(a|aa|aaa)\s*$`)
-	whoamiRegExp := regexp.MustCompile(`(?mi)^.*\s*who\s*are\s*you\s*$`)
-
-	for msg := range msgs {
-		if reg1.MatchString(msg.Msg) {
-			tempMsg := models.Message{
-				RoomID: msg.RoomID,
-				Msg:    "K chaina sodhaana baru... list banara dinhu!!!!",
-			}
-
-			_, err := realtimeClient.SendMessage(&tempMsg)
-			if err != nil {
-				fmt.Println("Error while sending a message!")
-				continue
-			}
-		} else if whoamiRegExp.MatchString(msg.Msg) {
-			m := models.PostMessage{
-
-				//RoomID: msg.RoomID,
-				RoomID:  msg.RoomID,
-				Channel: msg.Channel,
-				// ParseUrls
-				// Alias
-				// Emoji
-				// Avatar
-				Attachments: []models.Attachment{{ImageURL: "https://nepstuff.com/wp-content/uploads/2020/07/ezgif.com-crop-2.gif"}},
-			}
-			restClient.PostMessage(&m)
-
-			// restClient.Send(&channelDetails)
-			// tempMsg := models.Message{
-			// 	RoomID: msg.RoomID,
-			// 	Msg:    "K chaina sodhaana baru... list banara dinhu!!!!",
-			// }
-
-			// _, err := realtimeClient.SendMessage(&tempMsg)
-			// if err != nil {
-			// 	fmt.Println("Error while sending a message!")
-			// 	continue
-			// }
+	var chanIDS = make(map[string]string)
+	for _, val := range allChannels {
+		if _, exists := chanIDS[val]; exists {
+			continue
 		}
 
+		id, err := rc.GetChannelId(val)
+		if err != nil {
+			return nil, err
+		}
+		chanIDS[val] = id
 	}
-
+	return chanIDS, nil
 }
-*/

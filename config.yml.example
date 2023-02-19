@@ -11,17 +11,22 @@ server_details:
   password: EnterPAss
 
 ## channels to listen msg for 
+## these channels are for reply_to section
 channels: ['channel1','channel2']
 
-## reply to 
+## reply to message/commands
 reply_to:
   ## Replies to above channels
   ## Keep limited channels for optimal performance
   ## convert to go lang regex, use regex101.com for this
   ## Supports nodejs script only
   ## If exec_script is provided then other later properties will be ignored
+  ## the script will be provided following json data with "-d" switch,
+  ##
+  ## {"user_name" : "haribdr", room_id :"GENERAL", "msg": "full message"}
+  ##
   ## the script should finish executing within 10 seconds
-  ## the output from script should be on stdout and should follow the json structure
+  ## the output from script should be on stdout and should follow the given json structure
   ## 
   ## {
   ##    "text_reply": "",
@@ -39,8 +44,14 @@ reply_to:
   ## Video url to upload
   video_url: ''
 
-## Run in x minutes automatically
+## Run in x minutes automatically (x must be > 0)
+## the output from script should be on stdout and should follow the above json structure
 auto_run:
-## the script format is same as above
-- exec_script: "/path/to/nodejs_script.js"
-- channel: 'channel to send msg to'
+
+- exec_script: "/path/to/nodejs_script_one.js"
+  in_every: 10
+  channel: 'channel to send msg to'
+
+- exec_script: "/path/to/nodejs_script_two.js"
+  in_every: 10
+  channel: 'channel to send msg to'

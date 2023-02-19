@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"regexp"
 
 	"gopkg.in/yaml.v3"
 )
@@ -51,6 +52,7 @@ type ReplyTo struct {
 // for scripts that run periodically
 type AutoRun struct {
 	ExecScript string `yaml:"exec_script"`
+	InEvery    int    `yaml:"in_every"`
 	Channel    string `yaml:"channel"`
 }
 
@@ -63,11 +65,21 @@ type MsgReply struct {
 }
 
 func (c Configuration) String() string {
-	return fmt.Sprintf("Details:\n"+
+	output := fmt.Sprintf("Details:\n"+
 		"\tScheme: %s\n"+
 		"\tURL: %s\n"+
 		"\tChannels To Listen For Reply: %v\n",
 		c.ServerDetails.Scheme, c.ServerDetails.URL, c.Channels)
+
+	output += "\n\tReply to following msg regex: \n"
+	for _, val := range c.ReplyTo {
+		output += fmt.Sprintf("\t%#q\n", val.MsgRegex)
+	}
+	output += "\n\tRun following scripts\n"
+	for _, val := range c.AutoRun {
+		output += fmt.Sprintf("\tScript = %q in every %d mins at channel %q\n", val.ExecScript, val.InEvery, val.Channel)
+	}
+	return output
 }
 
 // readConfiguration reads configuration from
@@ -84,6 +96,59 @@ func readConfiguration() (*Configuration, error) {
 		return nil, err
 	}
 	return &config, nil
+}
+
+// checkValidity checks validness of scripts location,
+// regex data
+func (config *Configuration) checkValidity() error {
+	// check the validity of reply to
+	for _, replyData := range config.ReplyTo {
+		// check validity of regex
+		var regex = regexp.MustCompile(replyData.MsgRegex)
+		_ = regex
+		if len(replyData.ExecScript) > 0 {
+			// Check if script actually exists
+			if _, err := os.Stat(replyData.ExecScript); err != nil {
+				return err
+			} else {
+				// script exists
+				RegexActions[regex] = replyAction{
+					useScript:      true,
+					scriptLocation: replyData.ExecScript,
+				}
+			}
+		} else if len(replyData.TextReply) > 0 || len(replyData.ImageURL) > 0 || len(replyData.VideoURL) > 0 {
+			RegexActions[regex] = replyAction{
+				useScript: false,
+				textReply: replyData.TextReply,
+				imageURL:  replyData.ImageURL,
+				videoURL:  replyData.VideoURL,
+			}
+		} else {
+			return fmt.Errorf("exec_script is not provided and other details are also empty for regex %#q", replyData.MsgRegex)
+		}
+	}
+
+	// check the validity of auto run scripts
+	for _, details := range config.AutoRun {
+		// Check if script actually exists
+		if _, err := os.Stat(details.ExecScript); err != nil {
+			return err
+		}
+		if details.InEvery <= 0 {
+			return fmt.Errorf("the time period must be greater than 0 but provided %d for auto run script %#q", details.InEvery, details.ExecScript)
+		}
+
+		AutoRunScripts = append(AutoRunScripts,
+			AutoRun{
+				ExecScript: details.ExecScript,
+				InEvery:    details.InEvery,
+				Channel:    details.Channel,
+			})
+	}
+
+	// all valid details
+	return nil
 }
 
 // checks if msg response sent from
