@@ -2,4 +2,4 @@ build/
 logs/
 config.yml
 .env
-scripts/
+todo.md
