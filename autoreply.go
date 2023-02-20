@@ -69,54 +69,11 @@ func startAutoReply(config *Configuration, rc *realtime.Client) {
 						} else {
 							// buffered channel
 							reply := make(chan Result, 1)
-							go func(reply chan Result) {
-								// ticker
-								ticker := time.NewTicker(1 * time.Second)
-								count := 0
 
-								result := Result{}
-								go func() {
-									json := fmt.Sprintf("{\"user_name\" : \"%v\",\"room_id\": \"%s\", \"msg\" : \"%s\"}", msg.User.Name, msg.RoomID, msg.Msg)
-									// execute the script
-									data, err := exec.Command("node", replyAction.scriptLocation, "-d", json).CombinedOutput()
+							// exec the script
+							go execExternalScript(reply, replyAction.scriptLocation, true, msg.User.Name, msg.RoomID, msg.Msg)
 
-									// set the output from script onto the Result entity
-									if err != nil {
-										result = Result{
-											Output: "",
-											Err:    err,
-										}
-									} else {
-										result = Result{
-											Output: string(data),
-											Err:    nil,
-										}
-									}
-								}()
-
-								// loop over ticker
-								for range ticker.C {
-									// increment seconds count
-									count++
-									// if seconds count has crossed limit
-									if count > 9 {
-										reply <- Result{
-											Output: "",
-											Err:    fmt.Errorf("time out for while waiting for result"),
-										}
-										ticker.Stop()
-										break
-									}
-									// incase of result, send the result to the channel
-									if result.Output != "" || result.Err != nil {
-										reply <- result
-										ticker.Stop()
-										break
-									}
-								}
-
-							}(reply)
-
+							// get result of execution
 							result := <-reply
 							// close channel
 							close(reply)
@@ -165,4 +122,58 @@ func startAutoReply(config *Configuration, rc *realtime.Client) {
 	}
 
 	wg.Wait()
+}
+
+func execExternalScript(reply chan Result, scriptLocation string, inputData bool, userName, roomID, message string) {
+	// ticker
+	ticker := time.NewTicker(1 * time.Second)
+	count := 0
+
+	result := Result{}
+	go func() {
+		var data []byte
+		var err error
+		if inputData {
+			json := fmt.Sprintf("{\"user_name\" : \"%v\",\"room_id\": \"%s\", \"msg\" : \"%s\"}", userName, roomID, message)
+			// execute the script
+			data, err = exec.Command("node", scriptLocation, "-d", json).CombinedOutput()
+		} else {
+			// execute the script
+			data, err = exec.Command("node", scriptLocation).CombinedOutput()
+		}
+
+		// set the output from script onto the Result entity
+		if err != nil {
+			result = Result{
+				Output: "",
+				Err:    err,
+			}
+		} else {
+			result = Result{
+				Output: string(data),
+				Err:    nil,
+			}
+		}
+	}()
+
+	// loop over ticker
+	for range ticker.C {
+		// increment seconds count
+		count++
+		// if seconds count has crossed limit
+		if count > 9 {
+			reply <- Result{
+				Output: "",
+				Err:    fmt.Errorf("time out for while waiting for result"),
+			}
+			ticker.Stop()
+			break
+		}
+		// incase of result, send the result to the channel
+		if result.Output != "" || result.Err != nil {
+			reply <- result
+			ticker.Stop()
+			break
+		}
+	}
 }

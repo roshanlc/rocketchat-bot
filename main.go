@@ -21,10 +21,10 @@ type replyAction struct {
 	videoURL       string
 }
 
-// Map compiled regex with their replies
+// Map having compiled regex with their replies
 // Since we'll be doing concurrent reads only,
-// no mutex lock is necessary as of yet
-// maybe aded later
+// mutex lock will neccessary later
+// todo: add mutex locks
 var RegexActions = make(map[*regexp.Regexp]replyAction)
 
 // Slice of auto running scripts
@@ -61,7 +61,11 @@ func main() {
 	}
 
 	// login to server
-	realTimeClient, restClient, err = config.login()
+	realTimeClient, _, err = config.login()
+	if err != nil {
+		log.Println(err)
+		return
+	}
 
 	// get Channel IDS
 	channelIDs, err = config.getChannelIDs(realTimeClient)
@@ -77,11 +81,17 @@ func main() {
 
 	var wgMain sync.WaitGroup
 
-	// Start the cronjobs (replying and auto run scripts)
-	wgMain.Add(1)
+	// Start the jobs (replying and auto run scripts)
+	wgMain.Add(2)
+
 	go func() {
 		defer wgMain.Done()
 		startAutoReply(config, realTimeClient)
+	}()
+
+	go func() {
+		defer wgMain.Done()
+		startCronJobs(realTimeClient)
 	}()
 
 	wgMain.Wait()
