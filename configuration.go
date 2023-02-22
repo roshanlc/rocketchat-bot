@@ -153,18 +153,9 @@ func (config *Configuration) checkValidity() error {
 
 // checks if msg response sent from
 // scripts is empty or not
-func (m *MsgReply) isResponseEmpty() bool {
+func (m MsgReply) isResponseEmpty() bool {
 	if len(m.ImageURL) == 0 && len(m.VideoURL) == 0 && len(m.TextReply) == 0 {
 		return true
 	}
 	return false
 }
-
-// checks if all fields of response
-// are empty or not
-// func (m *ReplyTo) isResponseEmpty() bool {
-// 	if len(m.ImageURL) == 0 && len(m.VideoURL) == 0 && len(m.TextReply) == 0 {
-// 		return true
-// 	}
-// 	return false
-// }

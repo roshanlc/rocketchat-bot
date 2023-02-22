@@ -16,6 +16,7 @@ func startCronJobs(rc *realtime.Client) {
 		go schedule(func() {
 			reply := make(chan Result, 1)
 
+			log.Printf("executing script %q at %v\n", scripts.ExecScript, time.Now())
 			// exec the script
 			go execExternalScript(reply, scripts.ExecScript, false, "", "", "")
 
@@ -37,6 +38,11 @@ func startCronJobs(rc *realtime.Client) {
 				return
 			}
 
+			// incase of empty response, return from current execution
+			if msgReply.isResponseEmpty() {
+				log.Printf("empty response from script %q at %v\n", scripts.ExecScript, time.Now())
+				return
+			}
 			// send reply message to channel
 			tempMsg := models.Message{}
 			tempMsg.RoomID = channelIDs[scripts.Channel]

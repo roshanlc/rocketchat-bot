@@ -91,6 +91,12 @@ func startAutoReply(config *Configuration, rc *realtime.Client) {
 								continue
 							}
 
+							// incase of empty response, return from current execution
+							if msgReply.isResponseEmpty() {
+								log.Printf("empty response from script %q at %v\n", replyAction.scriptLocation, time.Now())
+								return
+							}
+
 							// send reply message to channel
 							tempMsg := models.Message{}
 							tempMsg.RoomID = msg.RoomID
